@@ -11,11 +11,23 @@ class ExpertIdeasBot:
     def run(pageTitle, newContent):
         # Set the edit summary message
         site = pywikibot.Site()
-        summary = i18n.twtranslate(site, 'ExpertIdeasBot-changing')
-        page = pywikibot.Page(site, pageTitle)
+        summary = i18n.twtranslate(site, u'ExpertIdeasBot-changing')
+        talkTitle = u"{talk}:{title}".format(talk=site.namespaces()[1][0], # fetch Talk ns name through pywikibot
+                                             title=pageTitle) 
+        page = pywikibot.Page(site, talkTitle)
+        
+        # Note: Can also test if bots can edit the page, e.g:
+        # if not page.botMayEdit():
+        #    pywikibot.output(u"Page %s is not bot-editable; skipping."
+        #                     % page.title(asLink=True))
+        #    return
+        #
+        # botMayEdit() returns false if {{nobots}} template is present, or {{bots}} template blacklists
+        # the current bot username.  It returns true if {{nobots}} whitelists the current bot username.
+        
         # Loads the given page, does some changes, and saves it.
         text = self.load(page)
-        if not text:
+        if text is None: # Note: can't use "if not text:", will fail if content is empty
             pywikibot.output(u'Page %s not retrieved appropriately.' % page.title(asLink=True))
             return
 
@@ -30,8 +42,7 @@ class ExpertIdeasBot:
             # Load the page
             text = page.get()
         except pywikibot.NoPage:
-            pywikibot.output(u"Page %s does not exist; skipping."
-                             % page.title(asLink=True))
+            text = u'' # if it doesn't exist, we'll create it
         except pywikibot.IsRedirectPage:
             pywikibot.output(u"Page %s is a redirect; skipping."
                              % page.title(asLink=True))
@@ -42,8 +53,17 @@ class ExpertIdeasBot:
     def save(self, text, page, comment=None, minorEdit=False,
              botflag=True, watchval=True):
         # Update the given page with new text.
-        # only save if something was changed
-        if text != page.get():
+        try:
+            old_text = page.get()
+        except pywikibot.NoPage:
+            pass # noop
+        except pywikibot.IsRedirectPage():
+            pywikibot.output(u"Page %s is a redirect; skipping."
+                             % page.title(asLink=True))
+            return False
+        
+        # only save if something was changed...
+        if text != old_text:
             # Show the title of the page we're working on.
             # Highlight the title in purple.
             pywikibot.output(u"\n\n>>> \03{lightpurple}%s\03{default} <<<"
@@ -75,17 +95,18 @@ class ExpertIdeasBot:
 
 def postCommentstoTalkpages(scholarsList):
     for scholarName, scholarPublicationList, scholarComment in scholarsList:
-
-        text = "\n== Professor " + scholarName + "'s comment on this article ==\n"
-        text += "\nProfessor " + scholarName + "has recently published the following research publications which are related to this Wikipedia article:\n"
+        text = u"\n== Professor {0}'s comment on this article ==\n".format(scholarName)
+        text += u"\nProfessor {0} has recently published the following research publications which are related to this Wikipedia article:\n".format(scholarName)
         for i in range(len(scholarPublicationList)):
-            text += "Reference " + i + ": " + scholarPublicationList[i]['name'] + " , Number of Ciations: " + scholarPublicationList[i]['citationsNumber'] + "\n"
-        text += "\nProfessor " + scholarName + "has reviewed this Wikipedia page, and provided us with the following comments to improve its quality:\n"
-        text += "\n" + scholarComment + "\n"
-        text += "\nWe hope Wikipedians on this talk page can take advantage of these comments and improve the quality of the article accordingly.\n"
-        text += "\n~~~~\n"
+            # Note: Use 1-index when printing i, Wikipedians might not be programmers ;-)
+            text += u"Reference {i}: {title}, Number of Citations: {n_citations}\n".format(i=i+1, title=scholarPublicationList[i]['name'], n_citations=scholarPublicationList[i]['citationsNumber'])
+        text += u"\nProfessor {0} has reviewed this Wikipedia page, and provided us with the following comments to improve its quality:\n".format(scholarName)
+        text += u"\n{0}\n".format(scholarComment)
+        text += u"\nWe hope Wikipedians on this talk page can take advantage of these comments and improve the quality of the article accordingly.\n"
+        text += u"\n~~~~\n"
 
         bot = ExpertIdeasBot()
-        bot.run("Talk:" + articleTitle, text)
+        # 
+        bot.run(articleTitle, text)
         # Add the main article to my watchlist to be informed about the Wikipedians' reactions to the comment.
         bot.run(articleTitle, "")
