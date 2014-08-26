@@ -106,7 +106,5 @@ def postCommentstoTalkpages(scholarsList):
         text += u"\n~~~~\n"
 
         bot = ExpertIdeasBot()
-        # 
+        # Post the comment to the corresponding Talk page, and add both the Talk page and the main article to the bot's watchlist.
         bot.run(articleTitle, text)
-        # Add the main article to my watchlist to be informed about the Wikipedians' reactions to the comment.
-        bot.run(articleTitle, "")
